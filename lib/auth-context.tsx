@@ -15,6 +15,7 @@ import {
   browserLocalPersistence,
 } from "firebase/auth"
 import { auth } from "./firebase"
+import { setStoredGoogleAccessToken } from "./google-token"
 
 interface AuthContextType {
   user: User | null
@@ -57,11 +58,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signInWithGoogle = async () => {
     const provider = new GoogleAuthProvider()
     provider.addScope("https://www.googleapis.com/auth/calendar")
-    await signInWithPopup(auth, provider)
+    const result = await signInWithPopup(auth, provider)
+    const credential = GoogleAuthProvider.credentialFromResult(result)
+    setStoredGoogleAccessToken(credential?.accessToken ?? null)
   }
 
   const logout = async () => {
     await signOut(auth)
+    setStoredGoogleAccessToken(null)
   }
 
   const value = {

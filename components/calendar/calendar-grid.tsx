@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useMemo, useEffect } from "react"
+import type { Dispatch, SetStateAction } from "react"
 import { Button } from "@/components/ui/button"
 import { ChevronLeft, ChevronRight } from "lucide-react"
 import { CalendarDay } from "./calendar-day"
@@ -35,7 +36,7 @@ const MONTHS = [
 
 interface CalendarGridProps {
   events: CalendarEvent[]
-  onEventsChange: (events: CalendarEvent[]) => void
+  onEventsChange: Dispatch<SetStateAction<CalendarEvent[]>>
 }
 
 export function CalendarGrid({ events, onEventsChange }: CalendarGridProps) {
@@ -44,11 +45,21 @@ export function CalendarGrid({ events, onEventsChange }: CalendarGridProps) {
   const [showEventDialog, setShowEventDialog] = useState(false)
 
   useEffect(() => {
-    const storedEvents = EventStorage.loadEvents()
-    if (storedEvents.length > 0 && events.length === 0) {
-      onEventsChange(storedEvents)
+    let isMounted = true
+
+    const loadEvents = async () => {
+      const storedEvents = await EventStorage.loadEvents()
+      if (isMounted && storedEvents.length > 0 && events.length === 0) {
+        onEventsChange(storedEvents)
+      }
     }
-  }, [])
+
+    loadEvents()
+
+    return () => {
+      isMounted = false
+    }
+  }, [events.length, onEventsChange])
 
   useEffect(() => {
     if (events.length > 0) {
@@ -90,7 +101,7 @@ export function CalendarGrid({ events, onEventsChange }: CalendarGridProps) {
       ...event,
       id: Math.random().toString(36).substr(2, 9),
     }
-    onEventsChange([...events, newEvent])
+    onEventsChange((prevEvents) => [...prevEvents, newEvent])
   }
 
   const handleUpdateEvent = (eventId: string, updates: Partial<CalendarEvent>) => {

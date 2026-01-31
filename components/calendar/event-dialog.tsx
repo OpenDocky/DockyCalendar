@@ -8,6 +8,13 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -45,6 +52,8 @@ export function EventDialog({ date, events, onClose, onAddEvent, onUpdateEvent, 
   const [startTime, setStartTime] = useState("09:00")
   const [endTime, setEndTime] = useState("10:00")
   const [selectedColor, setSelectedColor] = useState(EVENT_COLORS[0].value)
+  const [repeatFrequency, setRepeatFrequency] = useState<"none" | "daily" | "weekly" | "monthly">("none")
+  const [repeatUntil, setRepeatUntil] = useState("")
   const { exportEvent, deleteGoogleEvent, isGoogleConnected } = useGoogleCalendar()
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -69,13 +78,50 @@ export function EventDialog({ date, events, onClose, onAddEvent, onUpdateEvent, 
       })
       setEditingEventId(null)
     } else {
-      onAddEvent({
+      const baseEvent = {
         title,
         description,
         start,
         end,
         color: selectedColor,
-      })
+      }
+
+      if (repeatFrequency === "none" || !repeatUntil) {
+        onAddEvent(baseEvent)
+      } else {
+        const untilDate = parseDateInput(repeatUntil)
+        if (!untilDate) {
+          onAddEvent(baseEvent)
+          resetForm()
+          setShowAddForm(false)
+          return
+        }
+        untilDate.setHours(23, 59, 59, 999)
+
+        let currentStart = new Date(start)
+        let currentEnd = new Date(end)
+
+        for (let i = 0; i < 366; i++) {
+          if (currentStart > untilDate) break
+
+          onAddEvent({
+            ...baseEvent,
+            start: new Date(currentStart),
+            end: new Date(currentEnd),
+          })
+
+          if (repeatFrequency === "daily") {
+            currentStart.setDate(currentStart.getDate() + 1)
+            currentEnd.setDate(currentEnd.getDate() + 1)
+          } else if (repeatFrequency === "weekly") {
+            currentStart.setDate(currentStart.getDate() + 7)
+            currentEnd.setDate(currentEnd.getDate() + 7)
+          } else {
+            currentStart.setMonth(currentStart.getMonth() + 1)
+            currentEnd.setMonth(currentEnd.getMonth() + 1)
+          }
+        }
+      }
     }
 
     resetForm()
@@ -88,6 +134,8 @@ export function EventDialog({ date, events, onClose, onAddEvent, onUpdateEvent, 
     setStartTime("09:00")
     setEndTime("10:00")
     setSelectedColor(EVENT_COLORS[0].value)
+    setRepeatFrequency("none")
+    setRepeatUntil("")
   }
 
   const handleEdit = (event: CalendarEvent) => {
@@ -96,6 +144,8 @@ export function EventDialog({ date, events, onClose, onAddEvent, onUpdateEvent, 
     setStartTime(event.start.toTimeString().slice(0, 5))
     setEndTime(event.end.toTimeString().slice(0, 5))
     setSelectedColor(event.color || EVENT_COLORS[0].value)
+    setRepeatFrequency("none")
+    setRepeatUntil("")
     setEditingEventId(event.id)
     setShowAddForm(true)
   }
@@ -145,6 +195,21 @@ export function EventDialog({ date, events, onClose, onAddEvent, onUpdateEvent, 
       hour: "2-digit",
       minute: "2-digit",
     })}`
+  }
+
+  const formatDateInput = (value: Date) => {
+    const year = value.getFullYear()
+    const month = String(value.getMonth() + 1).padStart(2, "0")
+    const day = String(value.getDate()).padStart(2, "0")
+    return `${year}-${month}-${day}`
+  }
+
+  const parseDateInput = (value: string) => {
+    const [year, month, day] = value.split("-").map(Number)
+    if (!year || !month || !day) {
+      return null
+    }
+    return new Date(year, month - 1, day)
   }
 
   return (
@@ -285,6 +350,49 @@ export function EventDialog({ date, events, onClose, onAddEvent, onUpdateEvent, 
                     ))}
                   </div>
                 </div>
+
+                {!editingEventId && (
+                  <div className="space-y-2">
+                    <Label>Répéter l&apos;événement</Label>
+                    <div className="grid gap-3 md:grid-cols-2">
+                      <Select
+                        value={repeatFrequency}
+                        onValueChange={(value) => {
+                          const nextValue = value as "none" | "daily" | "weekly" | "monthly"
+                          setRepeatFrequency(nextValue)
+                          if (nextValue !== "none" && !repeatUntil) {
+                            const defaultUntil = new Date(date)
+                            defaultUntil.setDate(defaultUntil.getDate() + 7)
+                            setRepeatUntil(formatDateInput(defaultUntil))
+                          }
+                        }}
+                      >
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="Choisir une répétition" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">Ne pas répéter</SelectItem>
+                          <SelectItem value="daily">Chaque jour</SelectItem>
+                          <SelectItem value="weekly">Chaque semaine</SelectItem>
+                          <SelectItem value="monthly">Chaque mois</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <div className="space-y-1">
+                        <Label htmlFor="repeat-until" className="text-xs text-muted-foreground">
+                          Jusqu&apos;au
+                        </Label>
+                        <Input
+                          id="repeat-until"
+                          type="date"
+                          value={repeatUntil}
+                          onChange={(e) => setRepeatUntil(e.target.value)}
+                          disabled={repeatFrequency === "none"}
+                          min={formatDateInput(date)}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 <div className="flex gap-2">
                   <Button type="submit" className="flex-1">

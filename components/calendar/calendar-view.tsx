@@ -2,17 +2,25 @@
 
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
+import { ButtonGroup } from "@/components/ui/button-group"
+import { Dialog, DialogContent } from "@/components/ui/dialog"
 import { Calendar, LogOut, Plus } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
 import { CalendarGrid } from "./calendar-grid"
 import { CalendarStats } from "./calendar-stats"
+import { CalendarDayView } from "./calendar-day-view"
+import { CalendarWeekView } from "./calendar-week-view"
+import { CalendarAgendaView } from "./calendar-agenda-view"
 import { GoogleCalendarSync } from "./google-calendar-sync"
 import type { CalendarEvent } from "./calendar-grid"
+
+type CalendarViewMode = "month" | "day" | "week" | "30days" | "agenda"
 
 export function CalendarView() {
   const { user, logout } = useAuth()
   const [showSync, setShowSync] = useState(false)
   const [events, setEvents] = useState<CalendarEvent[]>([])
+  const [viewMode, setViewMode] = useState<CalendarViewMode>("month")
 
   const handleLogout = async () => {
     try {
@@ -59,21 +67,66 @@ export function CalendarView() {
         </div>
       </header>
 
-      {showSync && (
-        <div className="border-b bg-muted/50">
-          <div className="container mx-auto px-4 py-4">
-            <GoogleCalendarSync
-              onClose={() => setShowSync(false)}
-              events={events}
-              onEventsImported={handleEventsImported}
-            />
-          </div>
-        </div>
-      )}
+      <Dialog open={showSync} onOpenChange={setShowSync}>
+        <DialogContent className="p-0 border-0 bg-transparent shadow-none" showCloseButton={false}>
+          <GoogleCalendarSync
+            onClose={() => setShowSync(false)}
+            events={events}
+            onEventsImported={handleEventsImported}
+          />
+        </DialogContent>
+      </Dialog>
 
       <main className="container mx-auto px-4 py-6">
         <CalendarStats events={events} />
-        <CalendarGrid events={events} onEventsChange={setEvents} />
+        <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
+          <div className="text-sm font-medium text-muted-foreground">Vues</div>
+          <ButtonGroup className="flex-wrap">
+            <Button
+              size="sm"
+              variant={viewMode === "month" ? "default" : "outline"}
+              onClick={() => setViewMode("month")}
+            >
+              Mois
+            </Button>
+            <Button
+              size="sm"
+              variant={viewMode === "day" ? "default" : "outline"}
+              onClick={() => setViewMode("day")}
+            >
+              24h
+            </Button>
+            <Button
+              size="sm"
+              variant={viewMode === "week" ? "default" : "outline"}
+              onClick={() => setViewMode("week")}
+            >
+              7j
+            </Button>
+            <Button
+              size="sm"
+              variant={viewMode === "30days" ? "default" : "outline"}
+              onClick={() => setViewMode("30days")}
+            >
+              30j
+            </Button>
+            <Button
+              size="sm"
+              variant={viewMode === "agenda" ? "default" : "outline"}
+              onClick={() => setViewMode("agenda")}
+            >
+              Liste
+            </Button>
+          </ButtonGroup>
+        </div>
+
+        <div className="mt-6">
+          {viewMode === "month" && <CalendarGrid events={events} onEventsChange={setEvents} />}
+          {viewMode === "day" && <CalendarDayView events={events} />}
+          {viewMode === "week" && <CalendarWeekView events={events} />}
+          {viewMode === "30days" && <CalendarAgendaView events={events} rangeDays={30} title="Vue 30j" />}
+          {viewMode === "agenda" && <CalendarAgendaView events={events} title="Liste des evenements" />}
+        </div>
       </main>
     </div>
   )

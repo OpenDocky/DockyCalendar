@@ -26,6 +26,35 @@ export class EventStorage {
     }
   }
 
+  static async saveEvents(events: CalendarEvent[]): Promise<void> {
+    try {
+      const desiredIds = new Set(events.map((event) => event.id))
+      const existingSnapshot = await getDocs(collection(db, COLLECTION_NAME))
+
+      const deletions = existingSnapshot.docs
+        .filter((docSnap) => !desiredIds.has(docSnap.id))
+        .map((docSnap) => deleteDoc(doc(db, COLLECTION_NAME, docSnap.id)))
+
+      const upserts = events.map((event) => {
+        const { id, ...eventData } = event
+        return setDoc(
+          doc(db, COLLECTION_NAME, id),
+          {
+            ...eventData,
+            start: event.start,
+            end: event.end,
+          },
+          { merge: true },
+        )
+      })
+
+      await Promise.all([...upserts, ...deletions])
+    } catch (error) {
+      console.error("Error saving events to Firebase:", error)
+      throw error
+    }
+  }
+
   static async addEvent(event: CalendarEvent): Promise<void> {
     try {
       const { id, ...eventData } = event

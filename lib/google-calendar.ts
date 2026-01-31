@@ -1,5 +1,6 @@
 import type { User } from "firebase/auth"
 import { getAuth } from "firebase/auth"
+import { getStoredGoogleAccessToken, setStoredGoogleAccessToken } from "./google-token"
 
 export interface GoogleCalendarEvent {
   id: string
@@ -34,6 +35,12 @@ export class GoogleCalendarService {
 
   private async initializeAccessToken(user: User) {
     try {
+      const storedToken = getStoredGoogleAccessToken()
+      if (storedToken) {
+        this.accessToken = storedToken
+        return
+      }
+
       const auth = getAuth()
       const currentUser = auth.currentUser
 
@@ -47,23 +54,23 @@ export class GoogleCalendarService {
         throw new Error("User not signed in with Google")
       }
 
-      const tokenResult = await currentUser.getIdTokenResult(true)
       const userWithToken = currentUser as any
-
-      if (userWithToken.stsTokenManager?.accessToken) {
-        this.accessToken = userWithToken.stsTokenManager.accessToken
-      } else if (userWithToken.accessToken) {
+      if (userWithToken.accessToken) {
         this.accessToken = userWithToken.accessToken
+        setStoredGoogleAccessToken(this.accessToken)
       } else {
         await currentUser.reload()
         const reloadedUser = auth.currentUser as any
-        this.accessToken = reloadedUser?.stsTokenManager?.accessToken || null
+        this.accessToken = reloadedUser?.accessToken || null
+        if (this.accessToken) {
+          setStoredGoogleAccessToken(this.accessToken)
+        }
       }
 
       console.log("[v0] Access token initialized:", !!this.accessToken)
 
       if (!this.accessToken) {
-        console.error("[v0] No access token found in user object:", Object.keys(userWithToken))
+        console.error("[v0] No OAuth access token found in user object:", Object.keys(userWithToken))
       }
     } catch (error) {
       console.error("[v0] Error getting access token:", error)
@@ -75,6 +82,12 @@ export class GoogleCalendarService {
     if (!this.user) return
 
     try {
+      const storedToken = getStoredGoogleAccessToken()
+      if (storedToken) {
+        this.accessToken = storedToken
+        return
+      }
+
       const auth = getAuth()
       const currentUser = auth.currentUser
 
@@ -83,8 +96,9 @@ export class GoogleCalendarService {
       await currentUser.reload()
       const userWithToken = currentUser as any
 
-      if (userWithToken.stsTokenManager?.accessToken) {
-        this.accessToken = userWithToken.stsTokenManager.accessToken
+      if (userWithToken.accessToken) {
+        this.accessToken = userWithToken.accessToken
+        setStoredGoogleAccessToken(this.accessToken)
         console.log("[v0] Access token refreshed")
       }
     } catch (error) {
@@ -95,7 +109,7 @@ export class GoogleCalendarService {
   async fetchEvents(timeMin?: Date, timeMax?: Date): Promise<GoogleCalendarEvent[]> {
     if (!this.accessToken) {
       console.error("[v0] No access token available for fetchEvents")
-      throw new Error("Not authenticated with Google")
+      throw new Error("Session Google expirée. Reconnectez-vous pour synchroniser.")
     }
 
     try {
@@ -130,7 +144,8 @@ export class GoogleCalendarService {
         })
 
         if (!retryResponse.ok) {
-          throw new Error(`Failed to fetch events after refresh: ${retryResponse.statusText}`)
+          setStoredGoogleAccessToken(null)
+          throw new Error("Session Google expirée. Reconnectez-vous pour synchroniser.")
         }
 
         const data = await retryResponse.json()
@@ -160,7 +175,7 @@ export class GoogleCalendarService {
     timeZone?: string
   }): Promise<GoogleCalendarEvent> {
     if (!this.accessToken) {
-      throw new Error("Not authenticated with Google")
+      throw new Error("Session Google expirée. Reconnectez-vous pour synchroniser.")
     }
 
     try {
@@ -201,7 +216,8 @@ export class GoogleCalendarService {
         })
 
         if (!retryResponse.ok) {
-          throw new Error(`Failed to create event after refresh: ${retryResponse.statusText}`)
+          setStoredGoogleAccessToken(null)
+          throw new Error("Session Google expirée. Reconnectez-vous pour synchroniser.")
         }
 
         return await retryResponse.json()
@@ -224,7 +240,7 @@ export class GoogleCalendarService {
 
   async deleteEvent(eventId: string): Promise<void> {
     if (!this.accessToken) {
-      throw new Error("Not authenticated with Google")
+      throw new Error("Session Google expirée. Reconnectez-vous pour synchroniser.")
     }
 
     try {
