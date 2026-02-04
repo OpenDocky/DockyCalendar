@@ -141,3 +141,4 @@ If you find DockyCalendar useful, please consider giving it a star! It helps the
 Part of the [OpenDocky](https://github.com/OpenDocky) suite of tools
 
 [Website](https://drayko.xyz) • [GitHub](https://github.com/GraphStats)
+
