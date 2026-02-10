@@ -9,7 +9,6 @@
 ![Version](https://img.shields.io/badge/version-2.0-blue)
 ![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?logo=typescript&logoColor=white)
 ![Next.js](https://img.shields.io/badge/Next.js-black?logo=next.js&logoColor=white)
-
 ---
 
 ## ✨ Why DockyCalendar?
